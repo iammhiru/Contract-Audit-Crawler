@@ -1,0 +1,76 @@
+version: "3.8"
+
+services:
+  minio:
+    image: minio/minio
+    container_name: minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: admin123
+    volumes:
+      - minio_data:/data
+
+  postgres:
+    image: postgres:14
+    container_name: hive-postgres
+    environment:
+      POSTGRES_DB: metastore
+      POSTGRES_USER: hive
+      POSTGRES_PASSWORD: hive
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+  hive-metastore:
+    image: apache/hive:4.0.0
+    container_name: hive-metastore
+    environment:
+      SERVICE_NAME: metastore
+      DB_DRIVER: postgres
+      DB_HOST: postgres
+      DB_NAME: metastore
+      DB_USER: hive
+      DB_PASSWORD: hive
+      HIVE_AWS_ENDPOINT: http://minio:9000
+      HIVE_AWS_ACCESS_KEY: admin
+      HIVE_AWS_SECRET_KEY: admin123
+      HIVE_S3_PATH_STYLE_ACCESS: "true"
+    ports:
+      - "9083:9083"
+    depends_on:
+      - postgres
+      - minio
+
+  hive-server:
+    image: apache/hive:4.0.0
+    container_name: hiveserver2
+    environment:
+      SERVICE_NAME: hiveserver2
+      HIVE_METASTORE_URI: thrift://hive-metastore:9083
+      HIVE_AWS_ENDPOINT: http://minio:9000
+      HIVE_AWS_ACCESS_KEY: admin
+      HIVE_AWS_SECRET_KEY: admin123
+      HIVE_S3_PATH_STYLE_ACCESS: "true"
+    ports:
+      - "10000:10000"
+    depends_on:
+      - hive-metastore
+
+  trino:
+    image: trinodb/trino:latest
+    container_name: trino
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./trino/catalog:/etc/trino/catalog
+    depends_on:
+      - hive-metastore
+
+volumes:
+  minio_data:
+  pg_data:

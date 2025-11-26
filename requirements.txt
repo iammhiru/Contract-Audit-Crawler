@@ -3,3 +3,4 @@ webdriver-manager
 bs4
 html2text
 uuid
+pyyaml

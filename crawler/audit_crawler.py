@@ -82,7 +82,7 @@ def crawl_issue_detail(driver, url):
         if name_and_time:
             nt = name_and_time.find_elements(By.XPATH, ".//span")
             if len(nt) >= 3:
-                data["name"] = nt[0].text.strip()
+                data["project"] = nt[0].text.strip()
                 data["time"] = nt[-1].text.strip()
 
     overview = driver.find_elements(By.XPATH, "//span[contains(text(),'Overview')]")

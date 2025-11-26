@@ -26,7 +26,7 @@ def save_json(data: dict, title: str, folder="crawl"):
 def create_driver():
     options = webdriver.ChromeOptions()
 
-    # options.add_argument("--headless")
+    options.add_argument("--headless")
     # options.add_argument("--user-data-dir=/home/hieu/.config/google-chrome")
     # options.add_argument("--profile-directory=SoloditProfile")
     options.add_argument("--no-sandbox")
@@ -59,7 +59,7 @@ if __name__ == "__main__":
     driver = create_driver()
 
     try:
-        issues = crawl_multiple_pages(driver, total_pages=1, max_issue_per_page=2)
+        issues = crawl_multiple_pages(driver, total_pages=50, max_issue_per_page=10)
 
         for item in issues:
             print("==============================")

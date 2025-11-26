@@ -208,3 +208,5 @@ __marimo__/
 
 .idea/
 crawl/
+issues_output/
+full_report/

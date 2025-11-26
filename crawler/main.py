@@ -2,6 +2,7 @@ from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from audit_crawler import crawl_issue_list, crawl_issue_detail
+from solodit_full_report_crawler import crawl_full_report
 import json, os, re
 from datetime import datetime
 
@@ -54,17 +55,41 @@ def crawl_multiple_pages(driver, total_pages=3, max_issue_per_page=15):
         results.extend(data)
     return results
 
+def process_all_crawl_json(crawl_folder="crawl", output_folder="issues_output"):
+    os.makedirs(output_folder, exist_ok=True)
+
+    all_url = set()
+
+    for filename in os.listdir(crawl_folder):
+        if not filename.endswith(".json"):
+            continue
+
+        filepath = os.path.join(crawl_folder, filename)
+
+        with open(filepath, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            url = data.get("full_report_url", "")
+
+            if "solodit" not in url.lower():
+                continue
+            all_url.add(url)
+
+    for url in all_url:
+        print("Crawling full report for URL:", url)
+        crawl_full_report(url, f"{output_folder}")
+
 
 if __name__ == "__main__":
-    driver = create_driver()
-
-    try:
-        issues = crawl_multiple_pages(driver, total_pages=50, max_issue_per_page=10)
-
-        for item in issues:
-            print("==============================")
-            print("Crawling detail for issue:", item["title"])
-            result = crawl_issue_detail(driver, item["link"])
-            save_json(result, item["title"])
-    except Exception as e:
-        print("Đã có lỗi xảy ra trong quá trình crawl. Chi tiết:", str(e))
+    process_all_crawl_json()
+    # driver = create_driver()
+    #
+    # try:
+    #     issues = crawl_multiple_pages(driver, total_pages=50, max_issue_per_page=10)
+    #
+    #     for item in issues:
+    #         print("==============================")
+    #         print("Crawling detail for issue:", item["title"])
+    #         result = crawl_issue_detail(driver, item["link"])
+    #         save_json(result, item["title"])
+    # except Exception as e:
+    #     print("Đã có lỗi xảy ra trong quá trình crawl. Chi tiết:", str(e))

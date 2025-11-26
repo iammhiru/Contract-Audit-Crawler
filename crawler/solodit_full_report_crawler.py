@@ -1,8 +1,6 @@
 import requests
 import os
-import re
-import json
-import yaml
+import re, json
 from collections import defaultdict
 
 def convert_github_to_raw(url: str) -> str:
@@ -11,7 +9,7 @@ def convert_github_to_raw(url: str) -> str:
 
     return url
 
-def download_markdown(raw_url: str) -> str:
+def download_markdown(raw_url: str) -> str | None:
     headers = {"User-Agent": "Mozilla/5.0"}
 
     try:
@@ -38,23 +36,7 @@ def save_markdown(md_text: str, filename: str, folder="full_report"):
         f.write(md_text)
 
     print(f"Saved markdown: {filepath}")
-
-def crawl_full_report(full_report_url: str):
-
-    raw_url = convert_github_to_raw(full_report_url)
-    print("➡Raw URL:", raw_url)
-
-    md_text = download_markdown(raw_url)
-    if not md_text:
-        print("Failed to download md file.")
-        return None
-
-    print("Markdown downloaded successfully.")
-
-    fname = full_report_url.split("/")[-1].replace(".md", "")
-    save_markdown(md_text, fname)
-
-    return md_text
+    return filepath
 
 def nested_dict():
     return defaultdict(nested_dict)
@@ -295,16 +277,28 @@ def save_parsed_result(data, filepath: str):
     if ext == "json":
         with open(filepath, "w", encoding="utf8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-
-    elif ext in ("yaml", "yml"):
-        with open(filepath, "w", encoding="utf8") as f:
-            yaml.dump(data, f, allow_unicode=True)
-
     elif ext == "txt":
         with open(filepath, "w", encoding="utf8") as f:
             f.write(str(data))
-
     else:
         raise ValueError("Unsupported file extension. Use json, yaml, yml, or txt.")
 
     print(f"Saved parsed output to {filepath}")
+
+def crawl_full_report(full_report_url: str, output_filepath: str):
+
+    raw_url = convert_github_to_raw(full_report_url)
+    print("➡Raw URL:", raw_url)
+
+    md_text = download_markdown(raw_url)
+    if not md_text:
+        print("Failed to download md file.")
+        return None
+
+    print("Markdown downloaded successfully.")
+
+    fname = full_report_url.split("/")[-1].replace(".md", "")
+    filepath = save_markdown(md_text, fname)
+    final_issue = process_markdown_file(filepath)
+
+    save_parsed_result(final_issue, f"{output_filepath}/{fname}.json")

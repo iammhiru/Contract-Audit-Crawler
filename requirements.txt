@@ -4,3 +4,4 @@ bs4
 html2text
 uuid
 pyyaml
+kafka-python

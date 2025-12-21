@@ -2,8 +2,8 @@ version: "3.8"
 
 services:
   zookeeper:
-    image: confluentinc/cp-zookeeper:7.5.0
     container_name: zookeeper
+    image: confluentinc/cp-zookeeper:7.5.0
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
@@ -13,8 +13,8 @@ services:
       - backend
 
   kafka:
-    image: confluentinc/cp-kafka:7.5.0
     container_name: kafka
+    image: confluentinc/cp-kafka:7.5.0
     depends_on:
       - zookeeper
     ports:
@@ -22,14 +22,10 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
-
-      # 2 listeners: INTERNAL cho container, EXTERNAL cho host
       KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
       KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
-
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     networks:
       - backend
 
@@ -44,24 +40,62 @@ services:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: connect
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: http://kafka-connect:8083
+    networks:
+      - backend
+
+  kafka-connect:
+    container_name: kafka-connect
+    image: confluentinc/cp-kafka-connect:7.5.0
+    depends_on:
+      - kafka
+      - es01
+    ports:
+      - "8083:8083"
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: "kafka:29092"
+      CONNECT_REST_PORT: 8083
+      CONNECT_REST_ADVERTISED_HOST_NAME: "kafka-connect"
+
+      CONNECT_GROUP_ID: "connect-cluster"
+      CONNECT_CONFIG_STORAGE_TOPIC: "_connect-configs"
+      CONNECT_OFFSET_STORAGE_TOPIC: "_connect-offsets"
+      CONNECT_STATUS_STORAGE_TOPIC: "_connect-status"
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: "1"
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: "1"
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: "1"
+
+      CONNECT_KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+
+      CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/confluent-hub-components"
+      CONNECT_LOG4J_ROOT_LOGLEVEL: "INFO"
+    volumes:
+      - connect_plugins:/usr/share/confluent-hub-components
+    command:
+      - bash
+      - -c
+      - |
+        confluent-hub install --no-prompt confluentinc/kafka-connect-elasticsearch:latest
+        /etc/confluent/docker/run
     networks:
       - backend
 
   es01:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
     container_name: es01
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
     environment:
       - node.name=es01
       - cluster.name=es-cluster
-      - discovery.seed_hosts=es02
+      - network.host=0.0.0.0
+      - discovery.seed_hosts=es01,es02
       - cluster.initial_master_nodes=es01,es02
       - bootstrap.memory_lock=true
       - xpack.security.enabled=false
       - ES_JAVA_OPTS=-Xms1g -Xmx1g
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
     volumes:
       - esdata01:/usr/share/elasticsearch/data
     ports:
@@ -69,33 +103,28 @@ services:
     networks:
       - backend
 
-
   es02:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
     container_name: es02
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
     environment:
       - node.name=es02
       - cluster.name=es-cluster
-      - discovery.seed_hosts=es01
+      - network.host=0.0.0.0
+      - discovery.seed_hosts=es01,es02
       - cluster.initial_master_nodes=es01,es02
       - bootstrap.memory_lock=true
       - xpack.security.enabled=false
       - ES_JAVA_OPTS=-Xms1g -Xmx1g
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
     volumes:
       - esdata02:/usr/share/elasticsearch/data
     networks:
       - backend
 
   kibana:
-    image: docker.elastic.co/kibana/kibana:8.12.0
     container_name: kibana
+    image: docker.elastic.co/kibana/kibana:8.12.0
     depends_on:
       - es01
-      - es02
     environment:
       ELASTICSEARCH_HOSTS: "http://es01:9200"
     ports:
@@ -105,9 +134,8 @@ services:
 
 volumes:
   esdata01:
-    driver: local
   esdata02:
-    driver: local
+  connect_plugins:
 
 networks:
   backend:

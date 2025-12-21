@@ -4,7 +4,6 @@ from webdriver_manager.chrome import ChromeDriverManager
 from audit_crawler import crawl_issue_list, crawl_issue_detail
 from solodit_full_report_crawler import crawl_full_report
 import json, os, re
-from datetime import datetime
 
 def sanitize_filename(name: str) -> str:
     return re.sub(r'[\\/*?:"<>|]', '', name)
@@ -13,9 +12,8 @@ def save_json(data: dict, title: str, folder="crawl"):
     os.makedirs(folder, exist_ok=True)
 
     title_clean = sanitize_filename(title)
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
-    filename = f"{title_clean}_{timestamp}.json"
+    filename = f"{title_clean}.json"
     filepath = os.path.join(folder, filename)
 
     with open(filepath, "w", encoding="utf-8") as f:
@@ -27,9 +25,7 @@ def save_json(data: dict, title: str, folder="crawl"):
 def create_driver():
     options = webdriver.ChromeOptions()
 
-    options.add_argument("--headless")
-    # options.add_argument("--user-data-dir=/home/hieu/.config/google-chrome")
-    # options.add_argument("--profile-directory=SoloditProfile")
+    # options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
 
@@ -46,20 +42,20 @@ def create_driver():
     return driver
 
 
-def crawl_multiple_pages(driver, total_pages=3, max_issue_per_page=15):
+def crawl_multiple_pages(driver, start_page=1, total_pages=3, max_issue_per_page=15):
     results = []
-    for page in range(1, total_pages + 1):
+    for page in range(start_page, total_pages + start_page):
         data = crawl_issue_list(driver, page, max_issue_per_page)
         if not data:
             break
         results.extend(data)
     return results
 
+
 def process_all_crawl_json(crawl_folder="crawl", output_folder="issues_output"):
     os.makedirs(output_folder, exist_ok=True)
 
     all_url = set()
-
     for filename in os.listdir(crawl_folder):
         if not filename.endswith(".json"):
             continue
@@ -84,7 +80,7 @@ if __name__ == "__main__":
     # driver = create_driver()
     #
     # try:
-    #     issues = crawl_multiple_pages(driver, total_pages=50, max_issue_per_page=10)
+    #     issues = crawl_multiple_pages(driver, start_page=200, total_pages=100, max_issue_per_page=10)
     #
     #     for item in issues:
     #         print("==============================")

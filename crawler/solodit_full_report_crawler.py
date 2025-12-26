@@ -4,6 +4,7 @@ import re
 import json
 import requests
 import subprocess
+import hashlib
 from typing import Dict, List, Optional
 
 def _run(cmd: List[str]) -> None:
@@ -99,7 +100,40 @@ def shallow_clone_repo(repo_url: str, out_dir: str) -> str:
     _run(["git", "clone", "--depth", "1", "--no-tags", repo_url, dest])
     return dest
 
-def crawl_source_code_from_report(md_text: str, code_out_dir: str = "repos_code") -> List[dict]:
+def resolve_github_repo(repo_url: str, token: str | None = None) -> dict:
+    parsed = _parse_owner_repo(repo_url)
+    if not parsed:
+        raise ValueError(f"Invalid repo_url: {repo_url}")
+
+    owner, repo = parsed
+    api_url = f"https://api.github.com/repos/{owner}/{repo}"
+
+    headers = {"User-Agent": "audit-crawler"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    r = requests.get(api_url, headers=headers, timeout=15)
+    if r.status_code != 200:
+        raise RuntimeError(f"GitHub API failed ({r.status_code}): {api_url}")
+
+    data = r.json()
+    return {
+        "repo_id": data["id"],              # ⭐ CÁI BẠN THIẾU
+        "node_id": data.get("node_id"),
+        "full_name": data["full_name"],
+        "default_branch": data["default_branch"],
+        "archived": data["archived"],
+        "fork": data["fork"],
+        "html_url": data["html_url"],
+    }
+
+
+def crawl_source_code_from_report(
+    md_text: str,
+    code_out_dir: str = "repos_code",
+    github_token: str | None = None
+) -> List[dict]:
+
     repo_hints = extract_repo_ref_hints(md_text)
     results: List[dict] = []
 
@@ -108,51 +142,68 @@ def crawl_source_code_from_report(md_text: str, code_out_dir: str = "repos_code"
         ref = hint.get("ref")
 
         try:
+            # 1️⃣ Resolve repo metadata (LẤY repo_id)
+            repo_meta = resolve_github_repo(repo_url, token=github_token)
+            repo_id = repo_meta["repo_id"]
+            repo_key = f"github_repo_id:{repo_id}"
+
+            # 2️⃣ Chọn ref sử dụng
             if commit:
+                ref_used = commit
+                method = "tarball_commit"
                 artifact = download_github_tarball(repo_url, commit, code_out_dir)
-                results.append({
-                    "repo_url": repo_url,
-                    "method": "tarball_commit",
-                    "ref": commit,
-                    "artifact_path": artifact,
-                    "status": "OK",
-                })
-                print(f"[CODE OK] tarball(commit) {repo_url}@{commit} -> {artifact}")
 
             elif ref:
+                ref_used = ref
+                method = "tarball_ref"
                 artifact = download_github_tarball(repo_url, ref, code_out_dir)
-                results.append({
-                    "repo_url": repo_url,
-                    "method": "tarball_ref",
-                    "ref": ref,
-                    "artifact_path": artifact,
-                    "status": "OK",
-                })
-                print(f"[CODE OK] tarball(ref) {repo_url}@{ref} -> {artifact}")
 
             else:
-                dest = shallow_clone_repo(repo_url, code_out_dir)
-                results.append({
-                    "repo_url": repo_url,
-                    "method": "shallow_clone",
-                    "ref": None,
-                    "artifact_path": dest,
-                    "status": "OK",
-                })
-                print(f"[CODE OK] shallow {repo_url} -> {dest}")
+                ref_used = "shallow"
+                method = "shallow_clone"
+                artifact = shallow_clone_repo(repo_url, code_out_dir)
+
+            # 3️⃣ Tạo snapshot_id (BẮT BUỘC tự sinh)
+            snapshot_id = hashlib.sha256(
+                f"{repo_key}:{ref_used}".encode("utf-8")
+            ).hexdigest()[:24]
+
+            results.append({
+                "repo_url": repo_url,
+                "repo_id": repo_id,
+                "repo_key": repo_key,
+                "repo_full_name": repo_meta["full_name"],
+
+                "snapshot_id": snapshot_id,
+                "ref": ref_used,
+                "method": method,
+
+                "artifact_path": artifact,
+                "status": "OK",
+            })
+
+            print(
+                f"[CODE OK] {method} "
+                f"{repo_meta['full_name']}@{ref_used} "
+                f"snapshot_id={snapshot_id}"
+            )
 
         except Exception as e:
             results.append({
                 "repo_url": repo_url,
-                "method": "auto",
+                "repo_key": None,
+                "snapshot_id": None,
                 "ref": commit or ref,
+                "method": "auto",
                 "artifact_path": None,
                 "status": "ERROR",
                 "error": str(e),
             })
+
             print(f"[CODE ERROR] {repo_url} -> {e}")
 
     return results
+
 
 
 def convert_github_to_raw(url: str) -> str:

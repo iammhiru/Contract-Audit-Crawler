@@ -52,7 +52,7 @@ def crawl_multiple_pages(driver, start_page=1, total_pages=3, max_issue_per_page
     return results
 
 
-def process_all_crawl_json(crawl_folder="crawl", output_folder="issues_output"):
+def process_all_crawl_json(crawl_folder="crawl", output_folder="issues_output", repo_folder="repos"):
     os.makedirs(output_folder, exist_ok=True)
 
     all_url = set()
@@ -72,20 +72,20 @@ def process_all_crawl_json(crawl_folder="crawl", output_folder="issues_output"):
 
     for url in all_url:
         print("Crawling full report for URL:", url)
-        crawl_full_report(url, f"{output_folder}")
+        crawl_full_report(url, f"{output_folder}", f"{repo_folder}")
 
 
 if __name__ == "__main__":
-    process_all_crawl_json()
-    # driver = create_driver()
-    #
-    # try:
-    #     issues = crawl_multiple_pages(driver, start_page=200, total_pages=100, max_issue_per_page=10)
-    #
-    #     for item in issues:
-    #         print("==============================")
-    #         print("Crawling detail for issue:", item["title"])
-    #         result = crawl_issue_detail(driver, item["link"])
-    #         save_json(result, item["title"])
-    # except Exception as e:
-    #     print("Đã có lỗi xảy ra trong quá trình crawl. Chi tiết:", str(e))
+    # process_all_crawl_json()
+    driver = create_driver()
+
+    try:
+        issues = crawl_multiple_pages(driver, start_page=200, total_pages=100, max_issue_per_page=10)
+
+        for item in issues:
+            print("==============================")
+            print("Crawling detail for issue:", item["title"])
+            result = crawl_issue_detail(driver, item["link"])
+            save_json(result, item["title"])
+    except Exception as e:
+        print("Đã có lỗi xảy ra trong quá trình crawl. Chi tiết:", str(e))

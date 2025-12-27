@@ -489,7 +489,7 @@ def save_parsed_result(data, filepath: str):
 
     print(f"Saved parsed output to {filepath}")
 
-def crawl_full_report(full_report_url: str, output_filepath: str, repo_filepath: str):
+def crawl_full_report_solodit(full_report_url: str, output_filepath: str, repo_filepath: str):
 
     raw_url = convert_github_to_raw(full_report_url)
     print("➡Raw URL:", raw_url)

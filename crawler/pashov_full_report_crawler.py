@@ -459,7 +459,8 @@ def crawl_pashov_review_code_snapshots(
 
     def _download_one(kind: str, sha: str, url_from_report: str | None):
         try:
-            artifact = download_github_tarball(repo_url, sha, code_out_dir)
+            repo_out_dir = os.path.join(code_out_dir, str(repo_id))
+            artifact = download_github_tarball(repo_url, sha, repo_out_dir)
 
             snapshot_id = hashlib.sha256(
                 f"{repo_key}:{sha}".encode("utf-8")

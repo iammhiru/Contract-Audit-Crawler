@@ -20,6 +20,25 @@ def _parse_owner_repo(repo_url: str) -> Optional[tuple]:
     repo = m.group(2).replace(".git", "")
     return owner, repo
 
+def clone_repo_at_ref(repo_url: str, ref: str | None, out_dir: str) -> str:
+    parsed = _parse_owner_repo(repo_url)
+    if not parsed:
+        raise ValueError(f"Invalid repo_url: {repo_url}")
+
+    owner, repo = parsed
+    os.makedirs(out_dir, exist_ok=True)
+
+    dest = os.path.join(out_dir, f"{owner}__{repo}")
+
+    if not os.path.exists(dest):
+        _run(["git", "clone", "--no-tags", repo_url, dest])
+
+    if ref:
+        _run(["git", "-C", dest, "fetch", "--no-tags", "origin", ref])
+        _run(["git", "-C", dest, "checkout", "--force", ref])
+
+    return dest
+
 
 def extract_repo_ref_hints(md_text: str) -> Dict[str, Dict[str, Optional[str]]]:
     repo_map: Dict[str, Dict[str, Optional[str]]] = {}
@@ -154,16 +173,16 @@ def crawl_source_code_from_report(
 
             if commit:
                 ref_used = commit
-                method = "tarball_commit"
-                artifact = download_github_tarball(repo_url, commit, code_out_dir)
+                method = "git_commit"
+                artifact = clone_repo_at_ref(repo_url, commit, code_out_dir)
             elif ref:
                 ref_used = ref
-                method = "tarball_ref"
-                artifact = download_github_tarball(repo_url, ref, code_out_dir)
+                method = "git_ref"
+                artifact = clone_repo_at_ref(repo_url, ref, code_out_dir)
             else:
-                ref_used = "shallow"
-                method = "shallow_clone"
-                artifact = shallow_clone_repo(repo_url, code_out_dir)
+                ref_used = "default_branch"
+                method = "git_default"
+                artifact = clone_repo_at_ref(repo_url, None, code_out_dir)
 
             snapshot_id = hashlib.sha256(
                 f"{repo_key}:{ref_used}".encode("utf-8")
@@ -460,7 +479,7 @@ def crawl_pashov_review_code_snapshots(
     def _download_one(kind: str, sha: str, url_from_report: str | None):
         try:
             repo_out_dir = os.path.join(code_out_dir, str(repo_id))
-            artifact = download_github_tarball(repo_url, sha, repo_out_dir)
+            artifact = clone_repo_at_ref(repo_url, sha, repo_out_dir)
 
             snapshot_id = hashlib.sha256(
                 f"{repo_key}:{sha}".encode("utf-8")

@@ -7,10 +7,6 @@ from typing import Iterable
 from minio import Minio
 from minio.error import S3Error
 
-
-# =========================
-# MinIO client
-# =========================
 def make_minio_client() -> Minio:
     endpoint = os.getenv("MINIO_ENDPOINT", "localhost:9000")
     access_key = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
@@ -24,10 +20,6 @@ def make_minio_client() -> Minio:
         secure=secure,
     )
 
-
-# =========================
-# Ignore rules (repo-friendly)
-# =========================
 IGNORE_DIRS = {
     ".git",
     ".hg",
@@ -44,10 +36,6 @@ IGNORE_FILES = {
     ".DS_Store",
 }
 
-
-# =========================
-# Walk folder recursively
-# =========================
 def iter_all_files(root_dir: str) -> Iterable[str]:
     root_dir = os.path.abspath(root_dir)
 
@@ -61,9 +49,6 @@ def iter_all_files(root_dir: str) -> Iterable[str]:
             yield os.path.join(dirpath, name)
 
 
-# =========================
-# Helpers
-# =========================
 def ensure_bucket(client: Minio, bucket: str) -> None:
     if not client.bucket_exists(bucket):
         raise RuntimeError(
@@ -89,9 +74,6 @@ def object_exists(client: Minio, bucket: str, key: str) -> bool:
         raise
 
 
-# =========================
-# Upload logic
-# =========================
 def upload_folder(
     client: Minio,
     bucket: str,

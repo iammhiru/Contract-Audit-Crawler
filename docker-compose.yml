@@ -1,6 +1,87 @@
 version: "3.8"
 
 services:
+  airflow-postgres:
+    image: postgres:15
+    container_name: airflow-postgres
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow_pgdata:/var/lib/postgresql/data
+    networks:
+      - backend
+
+  airflow-init:
+    image: apache/airflow:2.8.1
+    container_name: airflow-init
+    depends_on:
+      - airflow-postgres
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__FERNET_KEY: ""
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./:/opt/project
+    entrypoint: /bin/bash
+    command: >
+      -c "
+      airflow db migrate &&
+      airflow users create
+        --username admin
+        --password admin
+        --firstname admin
+        --lastname admin
+        --role Admin
+        --email admin@example.com
+      "
+    networks:
+      - backend
+
+  airflow-webserver:
+    image: apache/airflow:2.8.1
+    container_name: airflow-webserver
+    depends_on:
+      - airflow-postgres
+      - airflow-init
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__FERNET_KEY: ""
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./:/opt/project
+    ports:
+      - "8080:8080"
+    command: webserver
+    networks:
+      - backend
+
+  airflow-scheduler:
+    image: apache/airflow:2.8.1
+    container_name: airflow-scheduler
+    depends_on:
+      - airflow-postgres
+      - airflow-init
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__FERNET_KEY: ""
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./:/opt/project
+    command: scheduler
+    networks:
+      - backend
+
   es01:
     container_name: es01
     image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
@@ -85,6 +166,7 @@ volumes:
   esdata01:
   esdata02:
   minio_data:
+  airflow_pgdata:
 
 networks:
   backend:
